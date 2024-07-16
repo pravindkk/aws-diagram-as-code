@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"strings"
+	// "fmt"
 
 	fontPath "github.com/pravindkk/aws-diagram-as-code/internal/font"
 	"github.com/golang/freetype/truetype"
@@ -197,7 +199,7 @@ func (r *Resource) prepareFontFace(hasChild bool, parent *Resource) font.Face {
 	}
 
 	opt := truetype.Options{
-		Size:              24,
+		Size:              16,
 		DPI:               0,
 		Hinting:           0,
 		GlyphCacheEntries: 0,
@@ -212,131 +214,143 @@ func (r *Resource) prepareFontFace(hasChild bool, parent *Resource) font.Face {
 }
 
 func (r *Resource) Scale(parent *Resource) {
-	log.Infof("Scale %s", r.label)
-	var prev *Resource
-	b := image.Rectangle{
-		image.Point{
-			math.MaxInt,
-			math.MaxInt,
-		},
-		image.Point{
-			math.MinInt,
-			math.MinInt,
-		},
-	}
-	hasChildren := len(r.children) != 0
-	fontFace := r.prepareFontFace(hasChildren, parent)
-	textBindings, _ := font.BoundString(fontFace, r.label)
-	textWidth := textBindings.Max.X.Ceil() - textBindings.Min.X.Ceil()
-	textHeight := textBindings.Max.Y.Ceil() - textBindings.Min.Y.Ceil()
-	if r.bindings == nil {
-		r.bindings = defaultResourceValues(hasChildren).bindings
-	}
-	if r.margin == nil {
-		r.margin = defaultResourceValues(hasChildren).margin
-		// Expand bindings to fit text size
-		if !hasChildren {
-			// Resource (no child)
-			r.margin.Bottom += textHeight
-			_m := (textWidth - r.iconBounds.Dx()) / 2
-			r.margin.Left = maxInt(r.margin.Left, _m)
-			r.margin.Right = maxInt(r.margin.Right, _m)
-		}
-	}
-	if r.padding == nil {
-		r.padding = defaultResourceValues(hasChildren).padding
-	}
-	if r.borderColor == nil {
-		r.borderColor = defaultResourceValues(hasChildren).borderColor
-	}
+    log.Infof("Scale %s", r.label)
+    var prev *Resource
+    b := image.Rectangle{
+        image.Point{
+            math.MaxInt,
+            math.MaxInt,
+        },
+        image.Point{
+            math.MinInt,
+            math.MinInt,
+        },
+    }
+    hasChildren := len(r.children) != 0
+    fontFace := r.prepareFontFace(hasChildren, parent)
 
-	// Expand bindings to fit text size
-	if hasChildren && r.direction == "vertical" {
-		// Group (has child)
-		prev = &Resource{
-			margin: &Margin{},
-			bindings: &image.Rectangle{
-				Min: image.Point{
-					0,
-					0,
-				},
-				Max: image.Point{
-					textWidth + r.iconBounds.Dx() + 30,
-					0,
-				},
-			},
-		}
-		b = *prev.bindings
-	}
+    // Calculate total text height for all lines
+    totalTextHeight := 0
+    lines := strings.Split(r.label, "|")
+    for _, line := range lines {
+        b, _ := font.BoundString(fontFace, line)
+        totalTextHeight += b.Max.Y.Ceil() - b.Min.Y.Ceil()
+    }
 
-	for _, subResource := range r.children {
-		subResource.Scale(parent)
-		bindings := subResource.GetBindings()
-		margin := subResource.GetMargin()
-		if prev != nil {
-			prevBindings := prev.GetBindings()
-			prevMargin := prev.GetMargin()
-			if r.direction == "horizontal" {
-				switch r.align {
-				case "top":
-					subResource.Translation(
-						prevBindings.Max.X+prevMargin.Right+margin.Left-bindings.Min.X,
-						prevBindings.Min.Y-prevMargin.Top+margin.Top-bindings.Min.Y,
-					)
-				case "center":
-					subResource.Translation(
-						prevBindings.Max.X+prevMargin.Right+margin.Left-bindings.Min.X,
-						prevBindings.Min.Y+(prevBindings.Dy()-bindings.Dy())/2-bindings.Min.Y,
-					)
-				case "bottom":
-					subResource.Translation(
-						prevBindings.Max.X+prevMargin.Right+margin.Left-bindings.Min.X,
-						prevBindings.Max.Y+prevMargin.Bottom-margin.Bottom-bindings.Max.Y,
-					)
-				default:
-					log.Fatalf("Unknown align %s in the direction(%s) on %s", r.align, r.direction, r.label)
-				}
-			} else {
-				switch r.align {
-				case "left":
-					subResource.Translation(
-						prevBindings.Min.X-prevMargin.Left+margin.Left-bindings.Min.X,
-						prevBindings.Max.Y+prevMargin.Bottom+margin.Top-bindings.Min.Y,
-					)
-				case "center":
-					subResource.Translation(
-						prevBindings.Min.X+(prevBindings.Dx()-bindings.Dx())/2-bindings.Min.X,
-						prevBindings.Max.Y+prevMargin.Bottom+margin.Top-bindings.Min.Y,
-					)
-				case "right":
-					subResource.Translation(
-						prevBindings.Max.X+prevMargin.Right-margin.Right-bindings.Min.X,
-						prevBindings.Max.Y+prevMargin.Bottom+margin.Top-bindings.Min.Y,
-					)
-				default:
-					log.Fatalf("Unknown align %s in the direction(%s) on %s", r.align, r.direction, r.label)
-				}
-			}
-		}
-		bindings = subResource.GetBindings()
-		b.Min.X = minInt(b.Min.X, bindings.Min.X-margin.Left-r.padding.Left)
-		b.Min.Y = minInt(b.Min.Y, bindings.Min.Y-margin.Top-r.iconBounds.Dy()-r.padding.Top)
-		b.Max.X = maxInt(b.Max.X, bindings.Max.X+margin.Right+r.padding.Right)
-		b.Max.Y = maxInt(b.Max.Y, bindings.Max.Y+margin.Bottom+r.padding.Bottom)
-		prev = subResource
-	}
-	// Expand bindings to fit text size
-	if hasChildren && r.direction == "horizontal" {
-		// Group (has child)
-		if textWidth+r.iconBounds.Dx()+30 > b.Dx() {
-			_dx := b.Dx()
-			b.Min.X -= (textWidth + r.iconBounds.Dx() + 30 - _dx) / 2
-			b.Max.X += (textWidth + r.iconBounds.Dx() + 30 - _dx) / 2
-		}
-	}
-	if b.Min.X != math.MaxInt {
-		r.SetBindings(b)
-	}
+    textWidth := 0
+    if len(lines) > 0 {
+        b, _ := font.BoundString(fontFace, lines[0])
+        textWidth = b.Max.X.Ceil() - b.Min.X.Ceil()
+    }
+
+    if r.bindings == nil {
+        r.bindings = defaultResourceValues(hasChildren).bindings
+    }
+    if r.margin == nil {
+        r.margin = defaultResourceValues(hasChildren).margin
+        // Expand bindings to fit text size
+        if !hasChildren {
+            // Resource (no child)
+            r.margin.Bottom += totalTextHeight
+            _m := (textWidth - r.iconBounds.Dx()) / 2
+            r.margin.Left = maxInt(r.margin.Left, _m)
+            r.margin.Right = maxInt(r.margin.Right, _m)
+        }
+    }
+    if r.padding == nil {
+        r.padding = defaultResourceValues(hasChildren).padding
+    }
+    if r.borderColor == nil {
+        r.borderColor = defaultResourceValues(hasChildren).borderColor
+    }
+
+    // Expand bindings to fit text size
+    if hasChildren && r.direction == "vertical" {
+        // Group (has child)
+        prev = &Resource{
+            margin: &Margin{},
+            bindings: &image.Rectangle{
+                Min: image.Point{
+                    0,
+                    0,
+                },
+                Max: image.Point{
+                    textWidth + r.iconBounds.Dx() + 30,
+                    0,
+                },
+            },
+        }
+        b = *prev.bindings
+    }
+
+    for _, subResource := range r.children {
+        subResource.Scale(parent)
+        bindings := subResource.GetBindings()
+        margin := subResource.GetMargin()
+        if prev != nil {
+            prevBindings := prev.GetBindings()
+            prevMargin := prev.GetMargin()
+            if r.direction == "horizontal" {
+                switch r.align {
+                case "top":
+                    subResource.Translation(
+                        prevBindings.Max.X+prevMargin.Right+margin.Left-bindings.Min.X,
+                        prevBindings.Min.Y-prevMargin.Top+margin.Top-bindings.Min.Y,
+                    )
+                case "center":
+                    subResource.Translation(
+                        prevBindings.Max.X+prevMargin.Right+margin.Left-bindings.Min.X,
+                        prevBindings.Min.Y+(prevBindings.Dy()-bindings.Dy())/2-bindings.Min.Y,
+                    )
+                case "bottom":
+                    subResource.Translation(
+                        prevBindings.Max.X+prevMargin.Right+margin.Left-bindings.Min.X,
+                        prevBindings.Max.Y+prevMargin.Bottom-margin.Bottom-bindings.Max.Y,
+                    )
+                default:
+                    log.Fatalf("Unknown align %s in the direction(%s) on %s", r.align, r.direction, r.label)
+                }
+            } else {
+                switch r.align {
+                case "left":
+                    subResource.Translation(
+                        prevBindings.Min.X-prevMargin.Left+margin.Left-bindings.Min.X,
+                        prevBindings.Max.Y+prevMargin.Bottom+margin.Top-bindings.Min.Y,
+                    )
+                case "center":
+                    subResource.Translation(
+                        prevBindings.Min.X+(prevBindings.Dx()-bindings.Dx())/2-bindings.Min.X,
+                        prevBindings.Max.Y+prevMargin.Bottom+margin.Top-bindings.Min.Y,
+                    )
+                case "right":
+                    subResource.Translation(
+                        prevBindings.Max.X+prevMargin.Right-margin.Right-bindings.Min.X,
+                        prevBindings.Max.Y+prevMargin.Bottom+margin.Top-bindings.Min.Y,
+                    )
+                default:
+                    log.Fatalf("Unknown align %s in the direction(%s) on %s", r.align, r.direction, r.label)
+                }
+            }
+        }
+        bindings = subResource.GetBindings()
+        b.Min.X = minInt(b.Min.X, bindings.Min.X-margin.Left-r.padding.Left)
+        b.Min.Y = minInt(b.Min.Y, bindings.Min.Y-margin.Top-r.iconBounds.Dy()-r.padding.Top)
+        b.Max.X = maxInt(b.Max.X, bindings.Max.X+margin.Right+r.padding.Right)
+        b.Max.Y = maxInt(b.Max.Y, bindings.Max.Y+margin.Bottom+r.padding.Bottom)
+        prev = subResource
+    }
+    // Expand bindings to fit text size
+    if hasChildren && r.direction == "horizontal" {
+        // Group (has child)
+        if textWidth+r.iconBounds.Dx()+30 > b.Dx() {
+            _dx := b.Dx()
+            b.Min.X -= (textWidth + r.iconBounds.Dx() + 30 - _dx) / 2
+            b.Max.X += (textWidth + r.iconBounds.Dx() + 30 - _dx) / 2
+        }
+    }
+    if b.Min.X != math.MaxInt {
+        r.SetBindings(b)
+    }
 }
 
 func (r *Resource) Translation(dx, dy int) {
@@ -462,44 +476,32 @@ func (r *Resource) drawMargin(img *image.RGBA) {
 	}
 }
 
-func splitString(s, sep string) []string {
-	var result []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if string(s[i:i+len(sep)]) == sep {
-			result = append(result, s[start:i])
-			start = i + len(sep)
-		}
-	}
-	result = append(result, s[start:])
-	return result
-}
-
 func (r *Resource) drawLabel(img *image.RGBA, parent *Resource, hasChild bool) {
-	face := r.prepareFontFace(hasChild, parent)
+    face := r.prepareFontFace(hasChild, parent)
 
-	lines := splitString(r.label, "\n")
-	for i, line := range lines {
-		b, _ := font.BoundString(face, line)
-		w := b.Max.X - b.Min.X + fixed.I(1)
-		h := b.Max.Y - b.Min.Y + fixed.I(1)
+    lines := strings.Split(r.label, "|")
+    for i, line := range lines {
+        b, _ := font.BoundString(face, line)
+        w := b.Max.X - b.Min.X + fixed.I(1)
+        h := b.Max.Y - b.Min.Y + fixed.I(1)
 
-		var p image.Point
-		var point fixed.Point26_6
-		if hasChild {
-			p = r.bindings.Min.Add(r.iconBounds.Max)
-			point = fixed.Point26_6{fixed.I(p.X) + 1000, fixed.I(p.Y) + (64-h)/2 + fixed.I(i*int(h.Ceil()))}
-		} else {
-			p = r.bindings.Min.Add(image.Point{0, r.iconBounds.Max.Y})
-			point = fixed.Point26_6{fixed.I(p.X) - (w-fixed.I(r.bindings.Dx()))/2, fixed.I(p.Y+10) + h + fixed.I(i*int(h.Ceil()))}
-		}
+        var p image.Point
+        var point fixed.Point26_6
 
-		d := &font.Drawer{
-			Dst:  img,
-			Src:  image.NewUniform(r.labelColor),
-			Face: face,
-			Dot:  point,
-		}
-		d.DrawString(line)
-	}
+        if hasChild {
+            p = r.bindings.Min.Add(r.iconBounds.Max)
+            point = fixed.Point26_6{fixed.I(p.X) + 1000, fixed.I(p.Y) + (64-h)/2 + fixed.I(i*int(h.Ceil()))}
+        } else {
+            p = r.bindings.Min.Add(image.Point{0, r.iconBounds.Max.Y})
+            point = fixed.Point26_6{fixed.I(p.X) - (w-fixed.I(r.bindings.Dx()))/2, fixed.I(p.Y+10) + h + fixed.I(i*int(h.Ceil()))}
+        }
+
+        d := &font.Drawer{
+            Dst:  img,
+            Src:  image.NewUniform(r.labelColor),
+            Face: face,
+            Dot:  point,
+        }
+        d.DrawString(line)
+    }
 }
