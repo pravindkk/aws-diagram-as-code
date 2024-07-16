@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/awslabs/diagram-as-code/internal/cache"
+	"github.com/pravindkk/aws-diagram-as-code/internal/cache"
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v3"
 )

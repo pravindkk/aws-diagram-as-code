@@ -16,8 +16,8 @@ import (
 
 	"github.com/aws-cloudformation/rain/cft"
 	"github.com/aws-cloudformation/rain/cft/parse"
-	"github.com/awslabs/diagram-as-code/internal/definition"
-	"github.com/awslabs/diagram-as-code/internal/types"
+	"github.com/pravindkk/aws-diagram-as-code/internal/definition"
+	"github.com/pravindkk/aws-diagram-as-code/internal/types"
 	log "github.com/sirupsen/logrus"
 )
 

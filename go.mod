@@ -1,4 +1,4 @@
-module github.com/awslabs/diagram-as-code
+module github.com/pravindkk/aws-diagram-as-code
 
 go 1.21
 

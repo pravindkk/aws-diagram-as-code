@@ -11,7 +11,7 @@ import (
 	"math"
 	"os"
 
-	fontPath "github.com/awslabs/diagram-as-code/internal/font"
+	fontPath "github.com/pravindkk/aws-diagram-as-code/internal/font"
 	"github.com/golang/freetype/truetype"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/image/draw"
@@ -465,23 +465,28 @@ func (r *Resource) drawMargin(img *image.RGBA) {
 func (r *Resource) drawLabel(img *image.RGBA, parent *Resource, hasChild bool) {
 	face := r.prepareFontFace(hasChild, parent)
 
-	b, _ := font.BoundString(face, r.label)
-	w := b.Max.X - b.Min.X + fixed.I(1)
-	h := b.Max.Y - b.Min.Y + fixed.I(1)
+	lines := strings.Split(r.label, "\n")
+	for i, line := range lines {
+		b, _ := font.BoundString(face, line)
+		w := b.Max.X - b.Min.X + fixed.I(1)
+		h := b.Max.Y - b.Min.Y + fixed.I(1)
 
-	p := r.bindings.Min.Add(image.Point{0, r.iconBounds.Max.Y})
+		var p image.Point
+		var point fixed.Point26_6
+		if hasChild {
+			p = r.bindings.Min.Add(r.iconBounds.Max)
+			point = fixed.Point26_6{fixed.I(p.X) + 1000, fixed.I(p.Y) + (64-h)/2 + fixed.I(i*int(h.Ceil()))}
+		} else {
+			p = r.bindings.Min.Add(image.Point{0, r.iconBounds.Max.Y})
+			point = fixed.Point26_6{fixed.I(p.X) - (w-fixed.I(r.bindings.Dx()))/2, fixed.I(p.Y+10) + h + fixed.I(i*int(h.Ceil()))}
+		}
 
-	point := fixed.Point26_6{fixed.I(p.X) - (w-fixed.I(r.bindings.Dx()))/2, fixed.I(p.Y+10) + h}
-	if hasChild {
-		p = r.bindings.Min.Add(r.iconBounds.Max)
-		point = fixed.Point26_6{fixed.I(p.X) + 1000, fixed.I(p.Y) + (64-h)/2}
+		d := &font.Drawer{
+			Dst:  img,
+			Src:  image.NewUniform(r.labelColor),
+			Face: face,
+			Dot:  point,
+		}
+		d.DrawString(line)
 	}
-
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.NewUniform(r.labelColor),
-		Face: face,
-		Dot:  point,
-	}
-	d.DrawString(r.label)
 }

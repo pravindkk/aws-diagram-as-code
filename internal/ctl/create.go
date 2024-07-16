@@ -11,9 +11,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/awslabs/diagram-as-code/internal/cache"
-	"github.com/awslabs/diagram-as-code/internal/definition"
-	"github.com/awslabs/diagram-as-code/internal/types"
+	"github.com/pravindkk/aws-diagram-as-code/internal/cache"
+	"github.com/pravindkk/aws-diagram-as-code/internal/definition"
+	"github.com/pravindkk/aws-diagram-as-code/internal/types"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 )

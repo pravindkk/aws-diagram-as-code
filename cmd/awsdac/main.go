@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/awslabs/diagram-as-code/internal/ctl"
+	"github.com/pravindkk/aws-diagram-as-code/internal/ctl"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
