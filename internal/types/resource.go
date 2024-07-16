@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"strings"
 
 	fontPath "github.com/pravindkk/aws-diagram-as-code/internal/font"
 	"github.com/golang/freetype/truetype"
@@ -463,10 +462,23 @@ func (r *Resource) drawMargin(img *image.RGBA) {
 	}
 }
 
+func splitString(s, sep string) []string {
+	var result []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if string(s[i:i+len(sep)]) == sep {
+			result = append(result, s[start:i])
+			start = i + len(sep)
+		}
+	}
+	result = append(result, s[start:])
+	return result
+}
+
 func (r *Resource) drawLabel(img *image.RGBA, parent *Resource, hasChild bool) {
 	face := r.prepareFontFace(hasChild, parent)
 
-	lines := strings.Split(r.label, "\n")
+	lines := splitString(r.label, "\n")
 	for i, line := range lines {
 		b, _ := font.BoundString(face, line)
 		w := b.Max.X - b.Min.X + fixed.I(1)
