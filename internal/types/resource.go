@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"strings"
 
 	fontPath "github.com/pravindkk/aws-diagram-as-code/internal/font"
 	"github.com/golang/freetype/truetype"
